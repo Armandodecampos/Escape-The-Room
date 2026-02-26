@@ -216,7 +216,7 @@
 
             // JOGADOR
             const playerShape = new CANNON.Sphere(0.7);
-            playerBody = new CANNON.Body({ mass: 1, material: playerMaterial });
+            playerBody = new CANNON.Body({ mass: 80, material: playerMaterial });
             playerBody.addShape(playerShape);
             playerBody.position.set(0, 2, -5);
             playerBody.fixedRotation = true;
@@ -226,7 +226,7 @@
             // CAIXA
             const bS = 1.8; // Aumentei ligeiramente o tamanho da caixa
             const boxShape = new CANNON.Box(new CANNON.Vec3(bS/2, bS/2, bS/2));
-            boxBody = new CANNON.Body({ mass: 5, material: boxMaterial });
+            boxBody = new CANNON.Body({ mass: 50, material: boxMaterial });
             boxBody.addShape(boxShape);
             boxBody.position.set(5, 2, -3);
             world.addBody(boxBody);
@@ -373,11 +373,8 @@
 
             if (isHoldingBox) {
                 isHoldingBox = false;
-                boxBody.mass = 5; boxBody.updateMassProperties();
             } else if (intersects.length > 0 && intersects[0].distance < 7) {
                 isHoldingBox = true;
-                boxBody.mass = 0; boxBody.velocity.set(0,0,0); boxBody.angularVelocity.set(0,0,0);
-                boxBody.updateMassProperties();
             }
         }
 
@@ -420,7 +417,12 @@
 
                 if (isHoldingBox) {
                     const target = new THREE.Vector3(0, -0.5, -4).applyQuaternion(camera.quaternion).add(camera.position);
-                    boxBody.position.lerp(new CANNON.Vec3(target.x, target.y, target.z), 0.25, boxBody.position);
+                    boxBody.velocity.set(
+                        (target.x - boxBody.position.x) * 10,
+                        (target.y - boxBody.position.y) * 10,
+                        (target.z - boxBody.position.z) * 10
+                    );
+                    boxBody.angularVelocity.set(0, 0, 0);
                 }
 
                 if (playerBody.position.z > 24 && playerBody.position.y > 4) {
