@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Escape Room 3D - Mobile Physics</title>
+    <title>Escape Room 3D - Noir Edition</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #000; touch-action: none; }
-        canvas { display: block; }
+        canvas { display: block; filter: grayscale(100%) contrast(120%); }
 
         /* Interface Principal */
         #crosshair {
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 4px;
-            height: 4px;
+            width: 6px;
+            height: 6px;
             background: rgba(255,255,255,0.8);
             border-radius: 50%;
             transform: translate(-50%, -50%);
@@ -28,7 +28,8 @@
             bottom: 40px;
             width: 120px;
             height: 120px;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.2);
             border-radius: 50%;
             z-index: 150;
             display: none;
@@ -55,7 +56,7 @@
             left: 50%;
             width: 80px;
             height: 80px;
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.1);
             border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
             transform: translateX(-50%);
@@ -68,9 +69,6 @@
             text-transform: uppercase;
             user-select: none;
             cursor: pointer;
-        }
-        #jump-btn:active {
-            background: rgba(255, 255, 255, 0.3);
         }
 
         /* Botão de Engrenagem */
@@ -93,7 +91,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0,0,0,0.95);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -103,26 +101,28 @@
         }
 
         .menu-card {
-            background: #1a1a1a;
+            background: #000;
             padding: 40px;
-            border-radius: 12px;
+            border-radius: 0px;
             text-align: center;
-            border: 1px solid #333;
+            border: 2px solid #fff;
             min-width: 300px;
         }
 
         button {
-            background: #444;
+            background: #222;
             color: white;
-            border: none;
+            border: 1px solid #fff;
             padding: 12px 24px;
             margin: 10px;
-            border-radius: 6px;
+            border-radius: 0px;
             cursor: pointer;
             font-size: 16px;
             width: 200px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
         }
-        button.primary { background: #e67e22; }
+        button.primary { background: #fff; color: #000; font-weight: bold; }
 
         .hidden { display: none !important; }
     </style>
@@ -141,8 +141,10 @@
 
     <div id="main-menu" class="overlay">
         <div class="menu-card">
-            <h1>ESCAPE ROOM</h1>
-            <button class="primary" onclick="startGame()">Iniciar Jogo</button>
+            <h1>NOIR ESCAPE</h1>
+            <p>A realidade perdeu o seu tom.</p>
+            <p>Encontre a luz na escuridão.</p>
+            <button class="primary" onclick="startGame()">Iniciar</button>
         </div>
     </div>
 
@@ -176,10 +178,12 @@
         const jumpBtn = document.getElementById('jump-btn');
         const uiLeftJoy = document.getElementById('left-joystick');
         const uiRightJoy = document.getElementById('right-joystick');
+        const crosshair = document.getElementById('crosshair');
 
         function init() {
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x050505);
+            scene.background = new THREE.Color(0x000000);
+            scene.fog = new THREE.FogExp2(0x000000, 0.05);
 
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
@@ -189,51 +193,62 @@
             document.body.appendChild(renderer.domElement);
 
             world = new CANNON.World();
-            world.gravity.set(0, -20, 0);
+            world.gravity.set(0, -25, 0); 
             world.defaultContactMaterial.friction = 0.5;
             world.defaultContactMaterial.restitution = 0.1;
 
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
             scene.add(ambientLight);
 
-            const roomLight = new THREE.PointLight(0xffaa44, 1.5, 30);
+            // Luz principal - agora branca fria
+            const roomLight = new THREE.PointLight(0xffffff, 1.5, 40);
             roomLight.position.set(0, 8, -5);
             roomLight.castShadow = true;
             scene.add(roomLight);
 
-            const exitLight = new THREE.PointLight(0xffffff, 3.0, 30);
+            // Luz de saída
+            const exitLight = new THREE.PointLight(0xffffff, 2.0, 30);
             exitLight.position.set(0, 7, 25);
             scene.add(exitLight);
 
-            const orangeMat = 0xcc6600;
-            const corridorMat = 0x111111;
-            const doorW = 4, doorH = 6, doorZ = 10, corrL = 15;
+            // MATERIAIS PRETO E BRANCO
+            const floorMat = 0x222222;
+            const wallMat = 0x666666;
+            const corridorMat = 0x0a0a0a;
+            const doorW = 4, doorH = 6, doorZ = 10, corrL = 20;
 
             // SALA PRINCIPAL
-            createWall(20, 1, 20, 0, -0.5, 0, orangeMat);  
-            createWall(20, 1, 20, 0, 12, 0, orangeMat);   
-            createWall(20, 12, 1, 0, 6, -10, orangeMat);  
-            createWall(1, 12, 20, -10, 6, 0, orangeMat);  
-            createWall(1, 12, 20, 10, 6, 0, orangeMat);   
+            createWall(20, 1, 20, 0, -0.5, 0, floorMat);  
+            createWall(20, 1, 20, 0, 12, 0, wallMat);   
+            createWall(20, 12, 1, 0, 6, -10, wallMat);  
+            createWall(1, 12, 20, -10, 6, 0, wallMat);  
+            createWall(1, 12, 20, 10, 6, 0, wallMat);   
             
+            const thresholdHeight = 5.5; 
             const sideW = (20 - doorW) / 2;
-            createWall(20, 4.5, 1, 0, 2.25, doorZ, orangeMat); 
-            createWall(sideW, 7.5, 1, -10 + sideW/2, 8.25, doorZ, orangeMat);
-            createWall(sideW, 7.5, 1, 10 - sideW/2, 8.25, doorZ, orangeMat);
-            createWall(doorW, 1.5, 1, 0, 11.25, doorZ, orangeMat);
+            
+            createWall(doorW, thresholdHeight, 1, 0, thresholdHeight / 2, doorZ, wallMat); 
+            createWall(sideW, 12, 1, -10 + sideW/2, 6, doorZ, wallMat);
+            createWall(sideW, 12, 1, 10 - sideW/2, 6, doorZ, wallMat);
+            
+            const topWallHeight = 12 - (thresholdHeight + doorH);
+            if(topWallHeight > 0) {
+                createWall(doorW, topWallHeight, 1, 0, 12 - topWallHeight/2, doorZ, wallMat);
+            }
 
             // CORREDOR
             const cZ = doorZ + corrL / 2;
-            createWall(1, doorH + 2, corrL, -doorW/2 - 0.5, 8, cZ, corridorMat); 
-            createWall(1, doorH + 2, corrL, doorW/2 + 0.5, 8, cZ, corridorMat);  
-            createWall(doorW + 2, 1, corrL, 0, 12, cZ, corridorMat); 
-            createWall(doorW + 2, 1, corrL, 0, 4, cZ, corridorMat);  
+            const floorLevel = thresholdHeight;
+            createWall(1, doorH + 2, corrL, -doorW/2 - 0.5, floorLevel + doorH/2, cZ, corridorMat); 
+            createWall(1, doorH + 2, corrL, doorW/2 + 0.5, floorLevel + doorH/2, cZ, corridorMat);  
+            createWall(doorW + 2, 1, corrL, 0, floorLevel + doorH, cZ, corridorMat); 
+            createWall(doorW + 2, 1, corrL, 0, floorLevel, cZ, corridorMat); 
             
             const lightWall = new THREE.Mesh(
-                new THREE.BoxGeometry(doorW, doorH + 2, 0.5),
+                new THREE.BoxGeometry(doorW, doorH, 0.5),
                 new THREE.MeshBasicMaterial({ color: 0xffffff })
             );
-            lightWall.position.set(0, 8, doorZ + corrL);
+            lightWall.position.set(0, floorLevel + doorH/2, doorZ + corrL);
             scene.add(lightWall);
 
             // JOGADOR
@@ -245,8 +260,8 @@
             playerBody.linearDamping = 0.9; 
             world.addBody(playerBody);
 
-            // OBJETO (CAIXA)
-            const bS = 1.2;
+            // OBJETO (CAIXA) - BRANCO PARA DESTACAR
+            const bS = 1.5;
             const boxShape = new CANNON.Box(new CANNON.Vec3(bS/2, bS/2, bS/2));
             boxBody = new CANNON.Body({ mass: 5 });
             boxBody.addShape(boxShape);
@@ -255,22 +270,27 @@
 
             boxMesh = new THREE.Mesh(
                 new THREE.BoxGeometry(bS, bS, bS),
-                new THREE.MeshPhongMaterial({ color: 0x552200 })
+                new THREE.MeshPhongMaterial({ color: 0xcccccc })
             );
             boxMesh.castShadow = true;
             scene.add(boxMesh);
 
             window.addEventListener('resize', onWindowResize);
-            document.addEventListener('keydown', (e) => updateKeyboard(e.code, 1));
-            document.addEventListener('keyup', (e) => updateKeyboard(e.code, 0));
             
+            window.addEventListener('keydown', (e) => updateKeyboard(e.code, 1));
+            window.addEventListener('keyup', (e) => updateKeyboard(e.code, 0));
+            
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mousedown', (e) => {
+                if(gameRunning && e.button === 0) interact();
+            });
+
             window.addEventListener('touchstart', handleTouchStart, { passive: false });
             window.addEventListener('touchmove', handleTouchMove, { passive: false });
             window.addEventListener('touchend', handleTouchEnd, { passive: false });
             
-            // Botão de pular mobile
-            jumpBtn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
+            jumpBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 tryJump();
             });
 
@@ -294,17 +314,22 @@
         function startGame() {
             mainMenu.classList.add('hidden');
             settingsBtn.classList.remove('hidden');
+            crosshair.classList.remove('hidden');
             uiLeftJoy.style.display = 'block';
             uiRightJoy.style.display = 'block';
             jumpBtn.style.display = 'flex';
             gameRunning = true;
-            if (!/Mobi|Android/i.test(navigator.userAgent)) document.body.requestPointerLock();
+            if (!/Mobi|Android/i.test(navigator.userAgent)) {
+                renderer.domElement.requestPointerLock();
+            }
         }
 
         function resumeGame() {
             optionsMenu.classList.add('hidden');
             gameRunning = true;
-            if (!/Mobi|Android/i.test(navigator.userAgent)) document.body.requestPointerLock();
+            if (!/Mobi|Android/i.test(navigator.userAgent)) {
+                renderer.domElement.requestPointerLock();
+            }
         }
 
         function openOptions() {
@@ -319,17 +344,23 @@
 
         function tryJump() {
             if (!gameRunning) return;
-            // Checagem de contato com o chão baseada na velocidade Y
-            // e verificação de proximidade com o chão para evitar pulos infinitos no ar
-            if (Math.abs(playerBody.velocity.y) < 0.8) {
-                playerBody.velocity.y = 10;
+            if (Math.abs(playerBody.velocity.y) < 0.5) {
+                playerBody.velocity.y = 9.8; 
+            }
+        }
+
+        function handleMouseMove(e) {
+            if (!gameRunning) return;
+            if (document.pointerLockElement === renderer.domElement) {
+                yaw -= e.movementX * 0.002;
+                pitch -= e.movementY * 0.002;
+                pitch = Math.max(-1.5, Math.min(1.5, pitch));
             }
         }
 
         function handleTouchStart(e) {
             if (!gameRunning) return;
             for (let t of e.changedTouches) {
-                // Áreas de interação
                 if (t.clientX < window.innerWidth / 3) {
                     joysticks.left.active = true;
                     joysticks.left.identifier = t.identifier;
@@ -340,20 +371,18 @@
                     joysticks.right.identifier = t.identifier;
                     joysticks.right.startX = t.clientX;
                     joysticks.right.startY = t.clientY;
-                } else if (t.target.id !== 'jump-btn') {
-                    // Clique no meio (mas não no botão de pulo) para interagir com objetos
-                    interact(t.clientX, t.clientY);
+                } else if (t.target.id !== 'jump-btn' && t.target.id !== 'settings-btn') {
+                    interact();
                 }
             }
         }
 
         function handleTouchMove(e) {
             if (!gameRunning) return;
-            e.preventDefault();
             for (let t of e.changedTouches) {
                 if (joysticks.left.active && t.identifier === joysticks.left.identifier) {
-                    joysticks.left.moveX = (t.clientX - joysticks.left.startX) / 50;
-                    joysticks.left.moveY = (t.clientY - joysticks.left.startY) / 50;
+                    joysticks.left.moveX = (t.clientX - joysticks.left.startX) / 40;
+                    joysticks.left.moveY = (t.clientY - joysticks.left.startY) / 40;
                     updateJoyUI(uiLeftJoy, joysticks.left.moveX, joysticks.left.moveY);
                 }
                 if (joysticks.right.active && t.identifier === joysticks.right.identifier) {
@@ -364,7 +393,7 @@
                     pitch = Math.max(-1.5, Math.min(1.5, pitch));
                     joysticks.right.startX = t.clientX;
                     joysticks.right.startY = t.clientY;
-                    updateJoyUI(uiRightJoy, dx*15, dy*15);
+                    updateJoyUI(uiRightJoy, dx*10, dy*10);
                 }
             }
         }
@@ -387,7 +416,7 @@
             const knob = el.querySelector('.joystick-knob');
             const limit = 40;
             const mag = Math.sqrt(x*x + y*y);
-            let tx = x * 20, ty = y * 20;
+            let tx = x * 15, ty = y * 15;
             if (mag > 2) { 
                 const angle = Math.atan2(y, x);
                 tx = Math.cos(angle) * limit; ty = Math.sin(angle) * limit;
@@ -395,8 +424,8 @@
             knob.style.transform = `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px))`;
         }
 
-        function interact(x, y) {
-            const mouse = new THREE.Vector2((x/window.innerWidth)*2-1, -(y/window.innerHeight)*2+1);
+        function interact() {
+            const mouse = new THREE.Vector2(0, 0); 
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObject(boxMesh);
@@ -421,10 +450,7 @@
                 case 'KeyS': input.backward = val; break;
                 case 'KeyA': input.left = val; break;
                 case 'KeyD': input.right = val; break;
-                case 'Space': 
-                    // Se a tecla for pressionada (val == 1)
-                    if(val) tryJump(); 
-                    break;
+                case 'Space': if(val) tryJump(); break;
             }
         }
 
@@ -446,24 +472,30 @@
                 let moveX = (input.left ? -1 : 0) + (input.right ? 1 : 0) + joysticks.left.moveX;
                 
                 let dir = new THREE.Vector3(moveX, 0, moveZ);
-                if (dir.length() > 1) dir.normalize();
-                dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-
-                playerBody.velocity.x = dir.x * 7;
-                playerBody.velocity.z = dir.z * 7;
+                if (dir.length() > 0.1) {
+                    if (dir.length() > 1) dir.normalize();
+                    dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+                    playerBody.velocity.x = dir.x * 7;
+                    playerBody.velocity.z = dir.z * 7;
+                } else {
+                    playerBody.velocity.x *= 0.8;
+                    playerBody.velocity.z *= 0.8;
+                }
 
                 camera.position.set(playerBody.position.x, playerBody.position.y + 0.6, playerBody.position.z);
 
                 if (isHoldingBox) {
-                    const target = new THREE.Vector3(0, 0, -3).applyQuaternion(camera.quaternion).add(camera.position);
+                    const target = new THREE.Vector3(0, 0, -3.5).applyQuaternion(camera.quaternion).add(camera.position);
                     boxBody.position.lerp(new CANNON.Vec3(target.x, target.y, target.z), 0.2, boxBody.position);
                     boxBody.velocity.set(0,0,0); 
                 }
 
-                if (playerBody.position.z > 24) {
+                if (playerBody.position.z > 24 && playerBody.position.y > 5) {
                     gameRunning = false;
-                    alert("Você escapou!");
-                    location.reload();
+                    const winOverlay = document.createElement('div');
+                    winOverlay.className = 'overlay';
+                    winOverlay.innerHTML = '<div class="menu-card"><h1>LIBERDADE</h1><p>A cor retornará... um dia.</p><button class="primary" onclick="location.reload()">Recomeçar</button></div>';
+                    document.body.appendChild(winOverlay);
                 }
             }
 
