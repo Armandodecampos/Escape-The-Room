@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Escape Room 3D - Mobile</title>
+    <title>Escape Room 3D - Mobile Physics</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #000; touch-action: none; }
         canvas { display: block; }
@@ -48,6 +48,31 @@
             pointer-events: none;
         }
 
+        /* Botão de Pular */
+        #jump-btn {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translateX(-50%);
+            display: none;
+            z-index: 160;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            user-select: none;
+            cursor: pointer;
+        }
+        #jump-btn:active {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
         /* Botão de Engrenagem */
         #settings-btn {
             position: absolute;
@@ -59,9 +84,7 @@
             z-index: 100;
             fill: white;
             opacity: 0.7;
-            transition: opacity 0.3s;
         }
-        #settings-btn:hover { opacity: 1; }
 
         /* Telas de Menu */
         .overlay {
@@ -98,21 +121,10 @@
             cursor: pointer;
             font-size: 16px;
             width: 200px;
-            transition: background 0.2s;
         }
-        button:hover { background: #666; }
         button.primary { background: #e67e22; }
-        button.primary:hover { background: #d35400; }
 
         .hidden { display: none !important; }
-
-        #controls-info {
-            font-size: 14px;
-            color: #aaa;
-            margin-top: 20px;
-            text-align: left;
-            line-height: 1.6;
-        }
     </style>
 </head>
 <body>
@@ -123,33 +135,22 @@
 
     <div id="crosshair" class="hidden"></div>
 
-    <!-- UI Joysticks -->
     <div id="left-joystick" class="joystick-container"><div class="joystick-knob"></div></div>
+    <div id="jump-btn">Pular</div>
     <div id="right-joystick" class="joystick-container"><div class="joystick-knob"></div></div>
 
     <div id="main-menu" class="overlay">
         <div class="menu-card">
             <h1>ESCAPE ROOM</h1>
-            <p>Consegues sair da sala?</p>
             <button class="primary" onclick="startGame()">Iniciar Jogo</button>
         </div>
     </div>
 
     <div id="options-menu" class="overlay hidden">
         <div class="menu-card">
-            <h2>Opções</h2>
-            <button onclick="toggleControls()">Controles</button>
+            <h2>Pausa</h2>
+            <button class="primary" onclick="resumeGame()">Continuar</button>
             <button onclick="exitToMenu()">Sair</button>
-            <button class="primary" onclick="resumeGame()">Voltar ao Jogo</button>
-            
-            <div id="controls-panel" class="hidden">
-                <div id="controls-info">
-                    <strong>Movimento:</strong> Joystick Esquerdo<br>
-                    <strong>Olhar:</strong> Joystick Direito<br>
-                    <strong>Agarrar/Largar:</strong> Tocar no objeto<br>
-                    <strong>Teclado:</strong> W,A,S,D + Rato
-                </div>
-            </div>
         </div>
     </div>
 
@@ -160,22 +161,19 @@
         let scene, camera, renderer, world;
         let playerBody, boxBody, boxMesh;
         let input = { forward: 0, backward: 0, left: 0, right: 0 };
-        let isGrounded = false;
         let isHoldingBox = false;
         let gameRunning = false;
         let pitch = 0, yaw = 0;
         
-        // Touch State
         let joysticks = {
-            left: { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0 },
-            right: { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0 }
+            left: { active: false, identifier: null, startX: 0, startY: 0, moveX: 0, moveY: 0 },
+            right: { active: false, identifier: null, startX: 0, startY: 0, moveX: 0, moveY: 0 }
         };
 
         const mainMenu = document.getElementById('main-menu');
         const optionsMenu = document.getElementById('options-menu');
         const settingsBtn = document.getElementById('settings-btn');
-        const crosshair = document.getElementById('crosshair');
-        const controlsPanel = document.getElementById('controls-panel');
+        const jumpBtn = document.getElementById('jump-btn');
         const uiLeftJoy = document.getElementById('left-joystick');
         const uiRightJoy = document.getElementById('right-joystick');
 
@@ -190,70 +188,73 @@
             renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
+            world = new CANNON.World();
+            world.gravity.set(0, -20, 0);
+            world.defaultContactMaterial.friction = 0.5;
+            world.defaultContactMaterial.restitution = 0.1;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
             scene.add(ambientLight);
 
-            const roomLight = new THREE.PointLight(0xffaa44, 1.5, 25);
+            const roomLight = new THREE.PointLight(0xffaa44, 1.5, 30);
             roomLight.position.set(0, 8, -5);
             roomLight.castShadow = true;
             scene.add(roomLight);
 
-            const exitLight = new THREE.PointLight(0xffffff, 2.5, 20);
+            const exitLight = new THREE.PointLight(0xffffff, 3.0, 30);
             exitLight.position.set(0, 7, 25);
             scene.add(exitLight);
 
-            world = new CANNON.World();
-            world.gravity.set(0, -18, 0);
-
             const orangeMat = 0xcc6600;
             const corridorMat = 0x111111;
-            const doorWidth = 4;
-            const doorHeight = 6;
-            const doorZ = 10;
-            const corridorLength = 15;
+            const doorW = 4, doorH = 6, doorZ = 10, corrL = 15;
 
-            createWall(20, 1, 20, 0, -0.5, 0, orangeMat); 
-            createWall(20, 1, 20, 0, 12, 0, orangeMat);
-
-            createWall(20, 12, 1, 0, 6, -10, orangeMat);
-            createWall(1, 12, 20, -10, 6, 0, orangeMat);
-            createWall(1, 12, 20, 10, 6, 0, orangeMat);
+            // SALA PRINCIPAL
+            createWall(20, 1, 20, 0, -0.5, 0, orangeMat);  
+            createWall(20, 1, 20, 0, 12, 0, orangeMat);   
+            createWall(20, 12, 1, 0, 6, -10, orangeMat);  
+            createWall(1, 12, 20, -10, 6, 0, orangeMat);  
+            createWall(1, 12, 20, 10, 6, 0, orangeMat);   
             
-            const sideWallWidth = (20 - doorWidth) / 2;
-            createWall(20, 4.5, 1, 0, 2.25, doorZ, orangeMat);
-            createWall(sideWallWidth, 7.5, 1, -10 + sideWallWidth/2, 8.25, doorZ, orangeMat);
-            createWall(sideWallWidth, 7.5, 1, 10 - sideWallWidth/2, 8.25, doorZ, orangeMat);
-            createWall(doorWidth, 1.5, 1, 0, 11.25, doorZ, orangeMat);
+            const sideW = (20 - doorW) / 2;
+            createWall(20, 4.5, 1, 0, 2.25, doorZ, orangeMat); 
+            createWall(sideW, 7.5, 1, -10 + sideW/2, 8.25, doorZ, orangeMat);
+            createWall(sideW, 7.5, 1, 10 - sideW/2, 8.25, doorZ, orangeMat);
+            createWall(doorW, 1.5, 1, 0, 11.25, doorZ, orangeMat);
 
-            const corridorZPos = doorZ + corridorLength / 2;
-            createWall(1, doorHeight + 1.5, corridorLength, -doorWidth/2 - 0.5, doorHeight/2 + 4.5, corridorZPos, corridorMat);
-            createWall(1, doorHeight + 1.5, corridorLength, doorWidth/2 + 0.5, doorHeight/2 + 4.5, corridorZPos, corridorMat);
-            createWall(doorWidth + 2, 1, corridorLength, 0, 12, corridorZPos, corridorMat);
-            createWall(doorWidth + 2, 1, corridorLength, 0, 4, corridorZPos, corridorMat);
+            // CORREDOR
+            const cZ = doorZ + corrL / 2;
+            createWall(1, doorH + 2, corrL, -doorW/2 - 0.5, 8, cZ, corridorMat); 
+            createWall(1, doorH + 2, corrL, doorW/2 + 0.5, 8, cZ, corridorMat);  
+            createWall(doorW + 2, 1, corrL, 0, 12, cZ, corridorMat); 
+            createWall(doorW + 2, 1, corrL, 0, 4, cZ, corridorMat);  
             
             const lightWall = new THREE.Mesh(
-                new THREE.BoxGeometry(doorWidth, doorHeight + 2, 0.5),
+                new THREE.BoxGeometry(doorW, doorH + 2, 0.5),
                 new THREE.MeshBasicMaterial({ color: 0xffffff })
             );
-            lightWall.position.set(0, 8, doorZ + corridorLength);
+            lightWall.position.set(0, 8, doorZ + corrL);
             scene.add(lightWall);
 
-            const playerShape = new CANNON.Sphere(0.5);
+            // JOGADOR
+            const playerShape = new CANNON.Sphere(0.6);
             playerBody = new CANNON.Body({ mass: 1 });
             playerBody.addShape(playerShape);
             playerBody.position.set(0, 2, -5);
             playerBody.fixedRotation = true;
+            playerBody.linearDamping = 0.9; 
             world.addBody(playerBody);
 
-            const boxSize = 1.2;
-            const boxShape = new CANNON.Box(new CANNON.Vec3(boxSize/2, boxSize/2, boxSize/2));
+            // OBJETO (CAIXA)
+            const bS = 1.2;
+            const boxShape = new CANNON.Box(new CANNON.Vec3(bS/2, bS/2, bS/2));
             boxBody = new CANNON.Body({ mass: 5 });
             boxBody.addShape(boxShape);
-            boxBody.position.set(4, 1, -2);
+            boxBody.position.set(4, 2, -2);
             world.addBody(boxBody);
 
             boxMesh = new THREE.Mesh(
-                new THREE.BoxGeometry(boxSize, boxSize, boxSize),
+                new THREE.BoxGeometry(bS, bS, bS),
                 new THREE.MeshPhongMaterial({ color: 0x552200 })
             );
             boxMesh.castShadow = true;
@@ -262,13 +263,16 @@
             window.addEventListener('resize', onWindowResize);
             document.addEventListener('keydown', (e) => updateKeyboard(e.code, 1));
             document.addEventListener('keyup', (e) => updateKeyboard(e.code, 0));
-            document.addEventListener('mousedown', onPointerDown);
-            document.addEventListener('mousemove', onMouseMove);
             
-            // Touch Events
             window.addEventListener('touchstart', handleTouchStart, { passive: false });
             window.addEventListener('touchmove', handleTouchMove, { passive: false });
             window.addEventListener('touchend', handleTouchEnd, { passive: false });
+            
+            // Botão de pular mobile
+            jumpBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                tryJump();
+            });
 
             settingsBtn.addEventListener('click', openOptions);
 
@@ -281,7 +285,7 @@
             mesh.receiveShadow = true;
             scene.add(mesh);
 
-            const body = new CANNON.Body({ mass: 0 });
+            const body = new CANNON.Body({ mass: 0 }); 
             body.addShape(new CANNON.Box(new CANNON.Vec3(w/2, h/2, d/2)));
             body.position.set(x, y, z);
             world.addBody(body);
@@ -290,94 +294,42 @@
         function startGame() {
             mainMenu.classList.add('hidden');
             settingsBtn.classList.remove('hidden');
-            crosshair.classList.remove('hidden');
             uiLeftJoy.style.display = 'block';
             uiRightJoy.style.display = 'block';
-            if (!isMobile()) document.body.requestPointerLock();
+            jumpBtn.style.display = 'flex';
             gameRunning = true;
-        }
-
-        function isMobile() {
-            return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        }
-
-        function openOptions() {
-            gameRunning = false;
-            document.exitPointerLock();
-            optionsMenu.classList.remove('hidden');
-            controlsPanel.classList.add('hidden');
+            if (!/Mobi|Android/i.test(navigator.userAgent)) document.body.requestPointerLock();
         }
 
         function resumeGame() {
             optionsMenu.classList.add('hidden');
-            if (!isMobile()) document.body.requestPointerLock();
             gameRunning = true;
+            if (!/Mobi|Android/i.test(navigator.userAgent)) document.body.requestPointerLock();
+        }
+
+        function openOptions() {
+            gameRunning = false;
+            optionsMenu.classList.remove('hidden');
+            document.exitPointerLock();
         }
 
         function exitToMenu() {
-            optionsMenu.classList.add('hidden');
-            settingsBtn.classList.add('hidden');
-            crosshair.classList.add('hidden');
-            uiLeftJoy.style.display = 'none';
-            uiRightJoy.style.display = 'none';
-            mainMenu.classList.remove('hidden');
-            gameRunning = false;
-            playerBody.position.set(0, 2, -5);
-            playerBody.velocity.set(0,0,0);
+            location.reload();
         }
 
-        function toggleControls() {
-            controlsPanel.classList.toggle('hidden');
-        }
-
-        function onPointerDown(e) {
+        function tryJump() {
             if (!gameRunning) return;
-            
-            // Lógica de Raycasting para interagir com a caixa
-            const mouse = new THREE.Vector2();
-            if (e.touches) {
-                mouse.x = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
-                mouse.y = -(e.touches[0].clientY / window.innerHeight) * 2 + 1;
-            } else {
-                // Se estiver com Pointer Lock, usa o centro, senão usa posição do rato
-                if (document.pointerLockElement) {
-                    mouse.set(0, 0);
-                } else {
-                    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-                    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-                }
-            }
-
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObject(boxMesh);
-
-            if (isHoldingBox) {
-                isHoldingBox = false;
-                boxBody.mass = 5;
-                boxBody.updateMassProperties();
-            } else if (intersects.length > 0 && intersects[0].distance < 6) {
-                isHoldingBox = true;
-                boxBody.mass = 0;
-                boxBody.velocity.set(0,0,0);
-                boxBody.updateMassProperties();
+            // Checagem de contato com o chão baseada na velocidade Y
+            // e verificação de proximidade com o chão para evitar pulos infinitos no ar
+            if (Math.abs(playerBody.velocity.y) < 0.8) {
+                playerBody.velocity.y = 10;
             }
         }
 
-        function onMouseMove(e) {
-            if (gameRunning && document.pointerLockElement) {
-                yaw -= e.movementX * 0.002;
-                pitch -= e.movementY * 0.002;
-                pitch = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, pitch));
-            }
-        }
-
-        // TOUCH HANDLING
         function handleTouchStart(e) {
             if (!gameRunning) return;
-            for (let i = 0; i < e.changedTouches.length; i++) {
-                const t = e.changedTouches[i];
-                // Verifica zona esquerda ou direita
+            for (let t of e.changedTouches) {
+                // Áreas de interação
                 if (t.clientX < window.innerWidth / 3) {
                     joysticks.left.active = true;
                     joysticks.left.identifier = t.identifier;
@@ -388,9 +340,9 @@
                     joysticks.right.identifier = t.identifier;
                     joysticks.right.startX = t.clientX;
                     joysticks.right.startY = t.clientY;
-                } else {
-                    // Toque no meio -> Interação
-                    onPointerDown(e);
+                } else if (t.target.id !== 'jump-btn') {
+                    // Clique no meio (mas não no botão de pulo) para interagir com objetos
+                    interact(t.clientX, t.clientY);
                 }
             }
         }
@@ -398,36 +350,33 @@
         function handleTouchMove(e) {
             if (!gameRunning) return;
             e.preventDefault();
-            for (let i = 0; i < e.changedTouches.length; i++) {
-                const t = e.changedTouches[i];
+            for (let t of e.changedTouches) {
                 if (joysticks.left.active && t.identifier === joysticks.left.identifier) {
-                    joysticks.left.moveX = (t.clientX - joysticks.left.startX) / 60;
-                    joysticks.left.moveY = (t.clientY - joysticks.left.startY) / 60;
+                    joysticks.left.moveX = (t.clientX - joysticks.left.startX) / 50;
+                    joysticks.left.moveY = (t.clientY - joysticks.left.startY) / 50;
                     updateJoyUI(uiLeftJoy, joysticks.left.moveX, joysticks.left.moveY);
                 }
                 if (joysticks.right.active && t.identifier === joysticks.right.identifier) {
-                    const dx = (t.clientX - joysticks.right.startX) * 0.005;
-                    const dy = (t.clientY - joysticks.right.startY) * 0.005;
+                    const dx = (t.clientX - joysticks.right.startX) * 0.006;
+                    const dy = (t.clientY - joysticks.right.startY) * 0.006;
                     yaw -= dx;
                     pitch -= dy;
-                    pitch = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, pitch));
+                    pitch = Math.max(-1.5, Math.min(1.5, pitch));
                     joysticks.right.startX = t.clientX;
                     joysticks.right.startY = t.clientY;
-                    updateJoyUI(uiRightJoy, dx * 10, dy * 10);
+                    updateJoyUI(uiRightJoy, dx*15, dy*15);
                 }
             }
         }
 
         function handleTouchEnd(e) {
-            for (let i = 0; i < e.changedTouches.length; i++) {
-                const t = e.changedTouches[i];
-                if (joysticks.left.active && t.identifier === joysticks.left.identifier) {
+            for (let t of e.changedTouches) {
+                if (t.identifier === joysticks.left.identifier) {
                     joysticks.left.active = false;
-                    joysticks.left.moveX = 0;
-                    joysticks.left.moveY = 0;
+                    joysticks.left.moveX = 0; joysticks.left.moveY = 0;
                     updateJoyUI(uiLeftJoy, 0, 0);
                 }
-                if (joysticks.right.active && t.identifier === joysticks.right.identifier) {
+                if (t.identifier === joysticks.right.identifier) {
                     joysticks.right.active = false;
                     updateJoyUI(uiRightJoy, 0, 0);
                 }
@@ -438,14 +387,31 @@
             const knob = el.querySelector('.joystick-knob');
             const limit = 40;
             const mag = Math.sqrt(x*x + y*y);
-            let tx = x * 20;
-            let ty = y * 20;
-            if (mag > 2) { // Clamp visual
+            let tx = x * 20, ty = y * 20;
+            if (mag > 2) { 
                 const angle = Math.atan2(y, x);
-                tx = Math.cos(angle) * limit;
-                ty = Math.sin(angle) * limit;
+                tx = Math.cos(angle) * limit; ty = Math.sin(angle) * limit;
             }
             knob.style.transform = `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px))`;
+        }
+
+        function interact(x, y) {
+            const mouse = new THREE.Vector2((x/window.innerWidth)*2-1, -(y/window.innerHeight)*2+1);
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObject(boxMesh);
+
+            if (isHoldingBox) {
+                isHoldingBox = false;
+                boxBody.mass = 5;
+                boxBody.updateMassProperties();
+            } else if (intersects.length > 0 && intersects[0].distance < 6) {
+                isHoldingBox = true;
+                boxBody.mass = 0; 
+                boxBody.velocity.set(0,0,0);
+                boxBody.angularVelocity.set(0,0,0);
+                boxBody.updateMassProperties();
+            }
         }
 
         function updateKeyboard(code, val) {
@@ -455,7 +421,10 @@
                 case 'KeyS': input.backward = val; break;
                 case 'KeyA': input.left = val; break;
                 case 'KeyD': input.right = val; break;
-                case 'Space': if(val && isGrounded) playerBody.velocity.y = 9; break;
+                case 'Space': 
+                    // Se a tecla for pressionada (val == 1)
+                    if(val) tryJump(); 
+                    break;
             }
         }
 
@@ -472,9 +441,7 @@
                 world.step(1/60);
 
                 camera.rotation.set(pitch, yaw, 0, 'YXZ');
-                const speed = 6;
                 
-                // Combina input teclado + joystick
                 let moveZ = (input.forward ? -1 : 0) + (input.backward ? 1 : 0) + joysticks.left.moveY;
                 let moveX = (input.left ? -1 : 0) + (input.right ? 1 : 0) + joysticks.left.moveX;
                 
@@ -482,21 +449,21 @@
                 if (dir.length() > 1) dir.normalize();
                 dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
 
-                playerBody.velocity.x = dir.x * speed;
-                playerBody.velocity.z = dir.z * speed;
+                playerBody.velocity.x = dir.x * 7;
+                playerBody.velocity.z = dir.z * 7;
 
                 camera.position.set(playerBody.position.x, playerBody.position.y + 0.6, playerBody.position.z);
-                if (Math.abs(playerBody.velocity.y) < 0.1) isGrounded = true;
 
                 if (isHoldingBox) {
-                    const target = new THREE.Vector3(0, 0, -2.5).applyQuaternion(camera.quaternion).add(camera.position);
-                    boxBody.position.copy(target);
+                    const target = new THREE.Vector3(0, 0, -3).applyQuaternion(camera.quaternion).add(camera.position);
+                    boxBody.position.lerp(new CANNON.Vec3(target.x, target.y, target.z), 0.2, boxBody.position);
+                    boxBody.velocity.set(0,0,0); 
                 }
 
                 if (playerBody.position.z > 24) {
                     gameRunning = false;
-                    alert("Nível 1 Concluído!");
-                    exitToMenu();
+                    alert("Você escapou!");
+                    location.reload();
                 }
             }
 
