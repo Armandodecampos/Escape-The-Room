@@ -266,6 +266,7 @@
             window.addEventListener('touchend', handleTouchEnd, { passive: false });
             jumpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); tryJump(); });
             settingsBtn.addEventListener('touchstart', (e) => { e.preventDefault(); openOptions(); });
+            settingsBtn.addEventListener('click', () => openOptions());
             renderer.domElement.addEventListener('click', () => {
                 if (gameRunning && !/Mobi|Android/i.test(navigator.userAgent)) {
                     renderer.domElement.requestPointerLock();
@@ -422,6 +423,11 @@
         }
 
         function updateKeyboard(code, val) {
+            if (code === 'Escape' && val) {
+                if (gameRunning) openOptions();
+                else if (!optionsMenu.classList.contains('hidden')) resumeGame();
+                return;
+            }
             if (!gameRunning) return;
             switch(code) {
                 case 'KeyW': input.forward = val; break;
