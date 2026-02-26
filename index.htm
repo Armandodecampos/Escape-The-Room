@@ -126,6 +126,7 @@
         <div class="menu-card">
             <h2>Pausa</h2>
             <button class="primary" onclick="resumeGame()">Voltar</button>
+            <button onclick="toggleMobileControls(event)">Controles Mobile: ON</button>
             <button onclick="exitToMenu()">Menu</button>
         </div>
     </div>
@@ -139,6 +140,7 @@
         let input = { forward: 0, backward: 0, left: 0, right: 0 };
         let isHoldingBox = false;
         let gameRunning = false;
+        let showMobileControls = true;
         let pitch = 0, yaw = 0;
         
         let joysticks = {
@@ -193,7 +195,7 @@
 
             // DIMENSÕES E MATERIAIS
             const doorW = 4, doorH = 6, doorZ = 10, corrL = 20;
-            const thresholdHeight = 5.5; // EXIGE A CAIXA PARA SAIR
+            const thresholdHeight = 5.0; // EXIGE A CAIXA PARA SAIR
 
             // CONSTRUÇÃO
             createWall(20, 1, 20, 0, -0.5, 0, 0x111111, groundMaterial);  // Chão
@@ -248,6 +250,11 @@
             window.addEventListener('touchend', handleTouchEnd, { passive: false });
             jumpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); tryJump(); });
             settingsBtn.addEventListener('touchstart', (e) => { e.preventDefault(); openOptions(); });
+            renderer.domElement.addEventListener('click', () => {
+                if (gameRunning && !/Mobi|Android/i.test(navigator.userAgent)) {
+                    renderer.domElement.requestPointerLock();
+                }
+            });
             animate();
         }
 
@@ -278,6 +285,21 @@
             gameRunning = true;
         }
 
+        function toggleMobileControls(e) {
+            showMobileControls = !showMobileControls;
+            const state = showMobileControls ? "ON" : "OFF";
+            const btn = e || window.event;
+            const target = btn.target || btn.srcElement;
+            target.innerText = "Controles Mobile: " + state;
+
+            const display = showMobileControls ? "block" : "none";
+            const flexDisplay = showMobileControls ? "flex" : "none";
+
+            uiLeftJoy.style.display = display;
+            uiRightJoy.style.display = display;
+            jumpBtn.style.display = flexDisplay;
+        }
+
         function openOptions() {
             gameRunning = false;
             optionsMenu.classList.remove('hidden');
@@ -290,7 +312,7 @@
             if (!gameRunning) return;
             // Detecção de chão melhorada: verifica velocidade vertical quase nula
             if (Math.abs(playerBody.velocity.y) < 0.8) {
-                playerBody.velocity.y = 15; // Ajustado para 15
+                playerBody.velocity.y = 17; // Ajustado para 15
             }
         }
 
