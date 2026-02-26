@@ -172,8 +172,8 @@
 
         function init() {
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x000000);
-            scene.fog = new THREE.FogExp2(0x000000, 0.04);
+            scene.background = new THREE.Color(0x111111);
+            scene.fog = new THREE.FogExp2(0x111111, 0.04);
 
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
@@ -195,7 +195,7 @@
             world.addContactMaterial(contactMaterial);
             world.addContactMaterial(playerBoxMaterial);
 
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
             scene.add(ambientLight);
 
             const roomLight = new THREE.PointLight(0xffffff, 1.5, 50);
@@ -226,9 +226,11 @@
 
             // Corredor de Saída
             const cZ = doorZ + corrL / 2;
-            createWall(doorW + 2, 1, corrL, 0, thresholdHeight, cZ, 0x050505, groundMaterial); // Chão corredor
-            createWall(1, doorH + 2, corrL, -doorW/2 - 0.5, thresholdHeight + doorH/2, cZ, 0x050505, groundMaterial); 
-            createWall(1, doorH + 2, corrL, doorW/2 + 0.5, thresholdHeight + doorH/2, cZ, 0x050505, groundMaterial);  
+            createWall(doorW, 1, corrL, 0, thresholdHeight, cZ, 0x050505, groundMaterial); // Chão corredor
+            createWall(1, doorH, corrL, -doorW/2 - 0.5, thresholdHeight + doorH/2, cZ, 0x050505, groundMaterial);
+            createWall(1, doorH, corrL, doorW/2 + 0.5, thresholdHeight + doorH/2, cZ, 0x050505, groundMaterial);
+            createWall(doorW, 1, corrL, 0, thresholdHeight + doorH, cZ, 0x050505, groundMaterial); // Teto corredor
+            createWall(doorW, doorH, 1, 0, thresholdHeight + doorH/2, doorZ + corrL, 0xffffff, groundMaterial); // Fundo Branco
 
             // JOGADOR
             const playerShape = new CANNON.Sphere(0.7);
@@ -249,7 +251,7 @@
 
             boxMesh = new THREE.Mesh(
                 new THREE.BoxGeometry(bS, bS, bS),
-                new THREE.MeshPhongMaterial({ color: 0xeeeeee })
+                new THREE.MeshLambertMaterial({ color: 0xeeeeee })
             );
             boxMesh.castShadow = true;
             scene.add(boxMesh);
@@ -278,7 +280,7 @@
         }
 
         function createWall(w, h, d, x, y, z, color, mat) {
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshPhongMaterial({ color }));
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color }));
             mesh.position.set(x, y, z);
             mesh.receiveShadow = true;
             scene.add(mesh);
