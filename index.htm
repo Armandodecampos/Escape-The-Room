@@ -193,7 +193,7 @@
 
             // DIMENSÕES E MATERIAIS
             const doorW = 4, doorH = 6, doorZ = 10, corrL = 20;
-            const thresholdHeight = 4.5; // BAIXEI de 5.5 para 4.5 para ser mais fácil
+            const thresholdHeight = 5.5; // EXIGE A CAIXA PARA SAIR
 
             // CONSTRUÇÃO
             createWall(20, 1, 20, 0, -0.5, 0, 0x111111, groundMaterial);  // Chão
@@ -290,7 +290,7 @@
             if (!gameRunning) return;
             // Detecção de chão melhorada: verifica velocidade vertical quase nula
             if (Math.abs(playerBody.velocity.y) < 0.8) {
-                playerBody.velocity.y = 12; // Aumentei a força do pulo
+                playerBody.velocity.y = 15; // Ajustado para 15
             }
         }
 
@@ -412,6 +412,9 @@
                     dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
                     playerBody.velocity.x = dir.x * 8;
                     playerBody.velocity.z = dir.z * 8;
+                } else if (Math.abs(playerBody.velocity.y) < 0.8) {
+                    playerBody.velocity.x = 0;
+                    playerBody.velocity.z = 0;
                 }
                 camera.position.set(playerBody.position.x, playerBody.position.y + 0.7, playerBody.position.z);
 
